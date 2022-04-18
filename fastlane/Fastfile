@@ -1,0 +1,147 @@
+require "json"
+require "net/http"
+require "uri"
+
+#Kobiton api url
+BASE_URL = 'https://api.kobiton.com/v1/'
+
+#Auth
+AUTH_B = 'Basic VG9ubnkubjo5NzU3OTQ2Yy04ODRkLTQ4NDAtOTcxZC00MWViMmE0MjdiM2U='
+
+#Dirs
+ROOT_PATH = File.expand_path('../.')
+RUNNERS = ROOT_PATH + "/build/packages/runner.ipa"
+APP_PATH = ROOT_PATH + "/build/packages/app.ipa"
+
+#iOS plataform lanes
+platform :ios do
+  desc "upload an ipa to kobiton"
+  lane :upload_app do
+      
+      puts "Executing uploading App..."
+      res_generate_url_app = Generate_url_app()
+
+      URL = res_generate_url_app["url"]
+      AppPath = res_generate_url_app["appPath"]
+
+      Upload_file_app(URL)
+
+      Create_app(AppPath)
+  end
+  
+  desc "upload an runner to kobiton"
+  lane :upload_runner do
+      
+      puts "Executing uploading runner..."
+      res_generate_url_runner = Generate_url_runner()
+
+      URL_runner = res_generate_url_runner["uploadUrl"]
+      RunnerPath = res_generate_url_runner["runnerPath"]
+
+      Upload_file_runner(URL_runner)
+
+      Runner_url = Create_runner(RunnerPath)
+      
+      Runner_url = Runner_url["downloadUrl"]
+      puts Runner_url
+      
+  end
+end
+
+#UPLOAD APP FUNCTIONS
+def Generate_url_app()
+    url = URI(BASE_URL + "apps/uploadUrl")
+    https = Net::HTTP.new(url.host, url.port)
+    https.use_ssl = true                                    #use SSL
+    request = Net::HTTP::Post.new(url)                      #POST
+    request["Authorization"] = AUTH_B                       #basic auth
+    request["Content-Type"] = "application/json"
+    request["Accept"] = "application/json"
+    request.body = JSON.dump({"filename": "app.ipa"})
+    response = https.request(request)
+    res = JSON.parse(response.read_body)
+    return res
+end
+
+
+def Upload_file_app(urlval)
+    puts "Uploading app, please wait..."
+    url = URI(urlval)
+    https = Net::HTTP.new(url.host, url.port)
+    https.use_ssl = true                                  #use SSL
+    request = Net::HTTP::Put.new(url)                     #PUT
+    request["Content-Type"] = "application/octet-stream"
+    request["x-amz-tagging"] = "unsaved=true"
+    
+    request.body = File.read(APP_PATH)
+
+    response = https.request(request)
+end
+	
+def Create_app(apppath)
+    url = URI(BASE_URL + "apps")
+    https = Net::HTTP.new(url.host, url.port)
+    https.use_ssl = true
+
+    request = Net::HTTP::Post.new(url)
+    request["Authorization"] = AUTH_B
+    request["Content-Type"] = "application/json"
+    request["Accept"] = "application/json"
+    request.body = JSON.dump({"appPath": apppath })
+
+    response = https.request(request)
+    resp = JSON.parse(response.read_body)
+    puts "Version ID: " + resp["versionId"].to_s
+    puts "App successfully upload"
+end
+#END UPLOAD APPS FUNCTIONS
+
+################################################################################
+
+#UPLOAD RUNNERS FUNCTIONS
+def Generate_url_runner()
+    url = URI(BASE_URL + "testRunner/uploadUrl")
+    https = Net::HTTP.new(url.host, url.port)
+    https.use_ssl = true                                    #use SSL
+    request = Net::HTTP::Post.new(url)                      #POST
+    request["Authorization"] = AUTH_B                       #basic auth
+    request["Content-Type"] = "application/json"
+    request["Accept"] = "application/json"
+    request.body = JSON.dump({"runnerName": "runner.ipa"})
+    response = https.request(request)
+    res = JSON.parse(response.read_body)
+    puts res
+    return res
+end
+
+
+def Upload_file_runner(urlval)
+    puts "Uploading runner, please wait..."
+    url = URI(urlval)
+    https = Net::HTTP.new(url.host, url.port)
+    https.use_ssl = true                                  #use SSL
+    request = Net::HTTP::Put.new(url)                     #PUT
+    request["Content-Type"] = "application/octet-stream"
+    request["x-amz-tagging"] = "unsaved=true"
+    
+    request.body = File.read(RUNNERS)
+    response = https.request(request)
+end
+    
+def Create_runner(runnerpath)
+    url = URI(BASE_URL + "testRunner/downloadUrl")
+    https = Net::HTTP.new(url.host, url.port)
+    https.use_ssl = true
+
+    request = Net::HTTP::Post.new(url)
+    request["Authorization"] = AUTH_B
+    request["Content-Type"] = "application/json"
+    request["Accept"] = "application/json"
+    request.body = JSON.dump({"runnerPath": runnerpath })
+
+    response = https.request(request)
+    res = JSON.parse(response.read_body)
+    puts "runner successfully upload"
+    return res
+end
+#END UPLOAD RUNNERS FUNCTIONS
